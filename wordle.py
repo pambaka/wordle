@@ -49,6 +49,7 @@ class WordleSession:
         self.__finished: bool = False
         self.__guess_count = guess_count
         self.__winner = False
+        self.__last_guess_hints: list[WordleLetterHint] = []
 
     @property
     def goal(self) -> str:
@@ -101,8 +102,9 @@ class WordleSession:
                 colored[i] = (guess_char, Color.YELLOW)
                 char_counts[guess_char] -= 1
         rv = ""
+        self.__last_guess_hints = colored
         for char, color in colored:
-            rv += f"{color}{char}{Color.RESET}"
+            rv += f"{color.value}{char}{Color.RESET.value}"
         return rv
 
     def guess(self, guess: str) -> None:
@@ -116,6 +118,22 @@ class WordleSession:
 
     def did_win(self) -> bool:
         return self.__finished and self.__winner
+
+    def is_valid_hard_mode_guess(self, guess: str) -> bool:
+        rest_guess_chars = list(guess)
+
+        for char, (goal_char, color) in zip(guess, self.__last_guess_hints):
+            if color == Color.GREEN:
+                if goal_char in rest_guess_chars:
+                    rest_guess_chars.remove(goal_char)
+                if char != goal_char:
+                    return False
+            elif color == Color.YELLOW:
+                if goal_char in rest_guess_chars:
+                    rest_guess_chars.remove(goal_char)
+                else:
+                    return False
+        return True
 
 
 class WordleDict:
@@ -157,32 +175,41 @@ class Wordle:
 
     def create_session(self) -> None:
         # DEBUG PLACE
+        goal = self.__dict.get_random()
+        print(goal)
         self.__sessions.append(
             # WordleSession("llama", guess_count=6)
-            WordleSession(self.__dict.get_random(), guess_count=6)
-        )
+            WordleSession(goal, guess_count=6)
+            )
 
-    def get_guess(self) -> str:
-        guess = ""
-        while not self.__dict.is_in_dictionary(guess):
+    def get_guess(self, is_hard_mode: bool = True) -> str:
+        def is_valid_guess(guess) -> bool:
+            # COMMENTED OUT FOR HARD MODE TESTING
+            # if not self.__dict.is_in_dictionary(guess):
+            #     print(f"{guess} is not a valid guess")
+            #     return False
+            if is_hard_mode and not self.__sessions[-1].is_valid_hard_mode_guess(guess):
+                print("hard mode violation")
+                return False
+            return True
+
+        guess = input("guess: ")
+        while not is_valid_guess(guess):
             try:
                 guess = input("guess: ")
-                if not self.__dict.is_in_dictionary(guess):
-                    print(f"{guess} is not a valid guess")
-                    print("\033[2F\033[K", end="")
             except EOFError:
                 print("\033[G", sep="", end="")
                 pass
         return guess
 
-    def do_next_session(self) -> None:
+    def do_next_session(self, is_hard_mode: bool) -> None:
         session = list(filter(lambda s: not s.is_finished(), self.__sessions))[
             0
         ]
         while not session.is_finished():
-            guess = self.get_guess()
+            guess = self.get_guess(is_hard_mode)
             session.guess(guess)
-            print("\033[2J\033[H")
+            # print("\033[2J\033[H")
             session.print_previous_guesses()
         if session.did_win():
             print("congratulations you're won!")
@@ -202,18 +229,19 @@ class Program:
 
     def __init__(self) -> None:
         self.__game = Wordle()
-        print("\033[2J\033[H")
+        # print("\033[2J\033[H")
         print(f"Welcome to {self.GAME_NAME}!")
         sleep(1)
         self.__quit = False
         self.MENU_ITEMS = [
             (["1", "play"], "Play round", Program.__play_round),
+            (["2", "hard"], "Play round (Hard mode)", Program.__play_hard_mode_round),
             (
-                ["2", "list"],
+                ["3", "list"],
                 "Look at previous session results",
                 Program.__list_sessions,
             ),
-            (["3", "quit", "q"], "Quit", Program.__quit_game),
+            (["4", "quit", "q"], "Quit", Program.__quit_game)
         ]
 
     def start(self) -> None:
@@ -223,7 +251,7 @@ class Program:
             return f"{triggers[0]}) {description}"
 
         while not self.__quit:
-            print("\033[2J\033[H")
+            # print("\033[2J\033[H")
             print(
                 *map(lambda t: unpack_options(*t), self.MENU_ITEMS), sep="\n"
             )
@@ -245,14 +273,17 @@ class Program:
         print("press any key to continue...", end="", flush=True)
         read(0, 1)
 
-    def __play_round(self) -> None:
+    def __play_round(self, is_hard_mode: bool = False) -> None:
         try:
             print("\033[2J\033[H")
             self.__game.create_session()
-            self.__game.do_next_session()
+            self.__game.do_next_session(is_hard_mode)
             self.__wait()
         except Exception as e:
             print(e, file=stderr)
+
+    def __play_hard_mode_round(self) -> None:
+        self.__play_round(is_hard_mode=True)
 
     def __list_sessions(self) -> None:
         print("Sessions:")
