@@ -88,7 +88,7 @@ class WordleSession:
     def get_colored_word(self, guess: tuple[str, list[Color]]) -> str:
         colored_word = ""
         for char, color in zip(*guess):
-            colored_word += color.value + char + Color.RESET
+            colored_word += color.value + char.upper() + " " + Color.RESET
         return colored_word
 
     def print_previous_guesses(self) -> None:
@@ -201,20 +201,23 @@ class Wordle:
 
     def get_guess(self, session: WordleSession) -> str:
         def is_valid_guess(guess) -> bool:
+            if not guess:
+                return False
             # COMMENTED OUT FOR HARD MODE TESTING
-            # if not self.__dict.is_in_dictionary(guess):
-            #     print(f"{guess} is not a valid guess")
-            #     return False
+            if not self.__dict.is_in_dictionary(guess):
+                print(f"{guess} is not a valid guess")
+                return False
             if (session.is_hard_mode
                     and not session.is_valid_hard_mode_guess(guess)):
                 print("hard mode violation")
                 return False
             return True
 
-        guess = input("guess: ")
+        guess = ""
         while not is_valid_guess(guess):
             try:
-                guess = input("guess: ")
+                guess = input("guess: ").lower()
+                # print("\033[2F\033[K", end="")
             except EOFError:
                 print("\033[G", sep="", end="")
                 pass
