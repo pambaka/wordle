@@ -196,6 +196,8 @@ class Wordle:
 
     def get_guess(self, session: WordleSession) -> str:
         def is_valid_guess(guess) -> bool:
+            if not guess:
+                return False
             # COMMENTED OUT FOR HARD MODE TESTING
             # if not self.__dict.is_in_dictionary(guess):
             #     print(f"{guess} is not a valid guess")
