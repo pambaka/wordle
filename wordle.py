@@ -44,15 +44,12 @@ class WordleSession:
     def __init__(self, word: str, guess_count: int = 6,
                  is_hard_mode: bool = False) -> None:
         self.__goal = word
+        self.__guess_count = guess_count
+        self.is_hard_mode = is_hard_mode
         self.__hints: list[WordleLetterHint] = list(
             map(lambda c: WordleLetterHint(c), word)
         )
-        self.__guesses: list[str] = []
-        self.__finished: bool = False
-        self.__guess_count = guess_count
-        self.__winner = False
-        self.__last_guess_hints: list[tuple[str, Color]] = []
-        self.is_hard_mode = is_hard_mode
+        self.__guesses: list[tuple[str, list[Color]]] = []
 
     @property
     def goal(self) -> str:
@@ -60,8 +57,18 @@ class WordleSession:
             return self.__goal
         return "cheater"
 
+    @property
+    def __winner(self) -> bool:
+        return (
+            bool(len(self.__guesses))
+            and all(color is Color.GREEN for color in self.__guesses[-1][1])
+        )
+
+    @property
+    def __finished(self) -> bool:
+        return self.__winner or len(self.__guesses) == self.__guess_count
+
     def __repr__(self) -> str:
-        guesses = ""
         goalstring = (
             "unfinished"
             if not self.__finished
@@ -69,69 +76,67 @@ class WordleSession:
             if self.__winner
             else f"goal: {self.__goal}"
         )
-        for guess in self.__guesses:
-            guesses += guess + "\n"
+        guesses = "\n".join(
+            self.get_colored_word(guess) for guess in self.__guesses
+        )
         return (
             f"{goalstring}\n"
             f"guesses: {len(self.__guesses)}/{self.__guess_count}\n"
             f"{guesses}"
         )
 
+    def get_colored_word(self, guess: tuple[str, list[Color]]) -> str:
+        colored_word = ""
+        for char, color in zip(*guess):
+            colored_word += color.value + char + Color.RESET
+        return colored_word
+
     def print_previous_guesses(self) -> None:
         for guess in self.__guesses:
-            print(guess)
+            print(self.get_colored_word(guess))
 
     def is_finished(self) -> bool:
         return self.__finished
 
-    def set_colors(self, guess: str) -> str:
-        colored: list[tuple[str, Color]] = []
+    def get_colors(self, guess: str) -> list[Color]:
+        colors: list[Color] = []
         char_counts = Counter(map(lambda h: h.letter, self.__hints))
         for i in range(len(guess)):
             guess_char = guess[i]
             hint = self.__hints[i]
             if hint.is_correct(guess_char):
-                colored.append((guess_char, Color.GREEN))
+                colors.append(Color.GREEN)
                 char_counts[guess_char] -= 1
             else:
-                colored.append((guess_char, Color.RESET))
+                colors.append(Color.RESET)
         for i in range(len(guess)):
             guess_char = guess[i]
             if (
-                colored[i][1] != Color.GREEN
+                colors[i] != Color.GREEN
                 and guess_char in char_counts
                 and char_counts[guess_char] > 0
             ):
-                colored[i] = (guess_char, Color.YELLOW)
+                colors[i] = Color.YELLOW
                 char_counts[guess_char] -= 1
-        rv = ""
-        self.__last_guess_hints = colored
-        for char, color in colored:
-            rv += f"{color.value}{char}{Color.RESET.value}"
-        return rv
+        return colors
 
     def guess(self, guess: str) -> None:
-        if guess == self.__goal:
-            self.__finished = True
-            self.__winner = True
-        guess = self.set_colors(guess)
-        self.__guesses.append(guess)
-        if len(self.__guesses) == self.__guess_count:
-            self.__finished = True
+        colors = self.get_colors(guess)
+        self.__guesses.append((guess, colors))
 
     def did_win(self) -> bool:
         return self.__finished and self.__winner
 
     def is_valid_hard_mode_guess(self, guess: str) -> bool:
+        if not bool(self.__guesses):
+            return True
         rest_guess_chars = list(guess)
-
-        for char, (goal_char, color) in zip(guess, self.__last_guess_hints):
+        for char, goal_char, color in zip(guess, *self.__guesses[-1]):
             if color == Color.GREEN:
                 if char != goal_char:
                     return False
                 rest_guess_chars.remove(goal_char)
-
-        for char, (goal_char, color) in zip(guess, self.__last_guess_hints):
+        for char, goal_char, color in zip(guess, *self.__guesses[-1]):
             if color == Color.YELLOW:
                 if goal_char not in rest_guess_chars:
                     return False
@@ -281,7 +286,7 @@ class Program:
             self.__game.run_session(is_hard_mode)
             self.__wait()
         except Exception as e:
-            print(e, file=stderr)
+            print(e, e.__cause__, file=stderr)
 
     def __list_sessions(self) -> None:
         print("Sessions:")
