@@ -107,7 +107,7 @@ class WordleSession:
         rv = ""
         self.__last_guess_hints = colored
         for char, color in colored:
-            rv += f"{color.value}{char}{Color.RESET.value}"
+            rv += color + char.upper() + " " + Color.RESET
         return rv
 
     def guess(self, guess: str) -> None:
@@ -146,7 +146,7 @@ class WordleDict:
     def __init__(self, path: str, wordlen: int = 5) -> None:
         with open(path) as dict_file:
             self.__dict: set[str] = set(
-                map(lambda s: s.strip(), dict_file.readlines())
+                map(lambda s: s.strip().lower(), dict_file.readlines())
             )
             for word in self.__dict:
                 if len(word) != wordlen:
@@ -206,10 +206,11 @@ class Wordle:
                 return False
             return True
 
-        guess = input("guess: ")
+        guess = ""
         while not is_valid_guess(guess):
             try:
-                guess = input("guess: ")
+                guess = input("guess: ").lower()
+                # print("\033[2F\033[K", end="")
             except EOFError:
                 print("\033[G", sep="", end="")
                 pass
