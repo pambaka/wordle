@@ -14,6 +14,17 @@ class Ansi(str, Enum):
     CSI = "\033["
 
 
+class Cursor(str, Enum):
+    erase_display = Ansi.CSI + "2J"
+    erase_line = Ansi.CSI + "2K"
+    erase_line_right = Ansi.CSI + "K"
+    home = Ansi.CSI + "H"
+    line_start = Ansi.CSI + "G"
+    prev_line = Ansi.CSI + "F"
+    prev_line_2 = Ansi.CSI + "2F"
+    next_line = Ansi.CSI + "E"
+
+
 class Color(str, Enum):
     GREEN = Ansi.CSI + "32m"
     YELLOW = Ansi.CSI + "33m"
@@ -104,8 +115,8 @@ class WordleSession:
             ):
                 colored[i] = (guess_char, Color.YELLOW)
                 char_counts[guess_char] -= 1
-        rv = ""
         self.__last_guess_hints = colored
+        rv = ""
         for char, color in colored:
             rv += color + char.upper() + " " + Color.RESET
         return rv
@@ -187,7 +198,7 @@ class Wordle:
         while not session.is_finished():
             guess = self.get_guess(session)
             session.guess(guess)
-            # print("\033[2J\033[H")
+            print(Cursor.erase_display + Cursor.home)
             session.print_previous_guesses()
         if session.did_win():
             print("congratulations you're won!")
@@ -195,27 +206,32 @@ class Wordle:
             print(f"eeeeeeeeeeeeyikes, you couldn't even guess {session.goal}")
 
     def get_guess(self, session: WordleSession) -> str:
-        def is_valid_guess(guess) -> bool:
-            if not guess:
+        def is_valid_guess(guess: str | None) -> bool:
+            if guess is None:
                 return False
-            # COMMENTED OUT FOR HARD MODE TESTING
-            # if not self.__dict.is_in_dictionary(guess):
-            #     print(f"{guess} is not a valid guess")
-            #     return False
+            if not guess:
+                print(Cursor.prev_line + Cursor.erase_line_right, end="")
+                return False
+            if not self.__dict.is_in_dictionary(guess):
+                print(Cursor.erase_line_right + "", end="")
+                print(f"{guess} is not a valid guess")
+                print(Cursor.prev_line_2 + Cursor.erase_line_right, end="")
+                return False
             if (session.is_hard_mode
                     and not session.is_valid_hard_mode_guess(guess)):
                 print("hard mode violation")
+                print(Cursor.prev_line_2 + Cursor.erase_line_right, end="")
                 return False
             return True
 
-        guess = ""
+        guess: str | None = None
         while not is_valid_guess(guess):
             try:
                 guess = input("guess: ").lower()
-                # print("\033[2F\033[K", end="")
             except EOFError:
-                print("\033[G", sep="", end="")
-                pass
+                print(Cursor.line_start + Cursor.erase_line_right, end="")
+                guess = None
+        assert guess is not None
         return guess
 
     def list_sessions(self) -> None:
@@ -231,7 +247,7 @@ class Program:
 
     def __init__(self) -> None:
         self.__game = Wordle()
-        # print("\033[2J\033[H")
+        print(Cursor.erase_display + Cursor.home)
         print(f"Welcome to {self.GAME_NAME}!")
         sleep(1)
         self.__quit = False
@@ -256,7 +272,7 @@ class Program:
             return f"{triggers[0]}) {description}"
 
         while not self.__quit:
-            # print("\033[2J\033[H")
+            print(Cursor.erase_display + Cursor.home)
             print(
                 *map(lambda t: unpack_options(*t), self.MENU_ITEMS), sep="\n"
             )
@@ -275,12 +291,12 @@ class Program:
         print("Quitting!")
 
     def __wait(self) -> None:
-        print("press any key to continue...", end="", flush=True)
+        print("press Enter to continue...", end="", flush=True)
         read(0, 1)
 
     def __play_round(self, is_hard_mode: bool = False) -> None:
         try:
-            print("\033[2J\033[H")
+            print(Cursor.erase_display + Cursor.home)
             self.__game.run_session(is_hard_mode)
             self.__wait()
         except Exception as e:
