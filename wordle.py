@@ -7,6 +7,7 @@ from os import read
 from random import choice
 from sys import stderr
 from time import sleep
+from functools import partial
 
 
 class Ansi(str, Enum):
@@ -40,7 +41,8 @@ class WordleLetterHint:
 
 
 class WordleSession:
-    def __init__(self, word: str, guess_count: int = 6) -> None:
+    def __init__(self, word: str, guess_count: int = 6,
+                 is_hard_mode: bool = False) -> None:
         self.__goal = word
         self.__hints: list[WordleLetterHint] = list(
             map(lambda c: WordleLetterHint(c), word)
@@ -50,6 +52,7 @@ class WordleSession:
         self.__guess_count = guess_count
         self.__winner = False
         self.__last_guess_hints: list[WordleLetterHint] = []
+        self.is_hard_mode = is_hard_mode
 
     @property
     def goal(self) -> str:
@@ -173,22 +176,32 @@ class Wordle:
             raise self.WordleException from e
         self.__sessions: list[WordleSession] = []
 
-    def create_session(self) -> None:
+    def run_session(self, is_hard_mode: bool = False) -> None:
         # DEBUG PLACE
         goal = self.__dict.get_random()
         print(goal)
-        self.__sessions.append(
-            # WordleSession("llama", guess_count=6)
-            WordleSession(goal, guess_count=6)
-            )
+        # session = WordleSession("llama", guess_count=6)
+        session = WordleSession(goal, guess_count=6, is_hard_mode=is_hard_mode)
+        self.__sessions.append(session)
 
-    def get_guess(self, is_hard_mode: bool = True) -> str:
+        while not session.is_finished():
+            guess = self.get_guess(session)
+            session.guess(guess)
+            # print("\033[2J\033[H")
+            session.print_previous_guesses()
+        if session.did_win():
+            print("congratulations you're won!")
+        else:
+            print(f"eeeeeeeeeeeeyikes, you couldn't even guess {session.goal}")
+
+    def get_guess(self, session: WordleSession) -> str:
         def is_valid_guess(guess) -> bool:
             # COMMENTED OUT FOR HARD MODE TESTING
             # if not self.__dict.is_in_dictionary(guess):
             #     print(f"{guess} is not a valid guess")
             #     return False
-            if is_hard_mode and not self.__sessions[-1].is_valid_hard_mode_guess(guess):
+            if (session.is_hard_mode
+                    and not session.is_valid_hard_mode_guess(guess)):
                 print("hard mode violation")
                 return False
             return True
@@ -201,20 +214,6 @@ class Wordle:
                 print("\033[G", sep="", end="")
                 pass
         return guess
-
-    def do_next_session(self, is_hard_mode: bool) -> None:
-        session = list(filter(lambda s: not s.is_finished(), self.__sessions))[
-            0
-        ]
-        while not session.is_finished():
-            guess = self.get_guess(is_hard_mode)
-            session.guess(guess)
-            # print("\033[2J\033[H")
-            session.print_previous_guesses()
-        if session.did_win():
-            print("congratulations you're won!")
-        else:
-            print(f"eeeeeeeeeeeeyikes, you couldn't even guess {session.goal}")
 
     def list_sessions(self) -> None:
         for id, session in enumerate(self.__sessions):
@@ -235,7 +234,10 @@ class Program:
         self.__quit = False
         self.MENU_ITEMS = [
             (["1", "play"], "Play round", Program.__play_round),
-            (["2", "hard"], "Play round (Hard mode)", Program.__play_hard_mode_round),
+            (
+                ["2", "hard"],
+                "Play round (Hard mode)",
+                partial(Program.__play_round, is_hard_mode=True)),
             (
                 ["3", "list"],
                 "Look at previous session results",
@@ -276,14 +278,10 @@ class Program:
     def __play_round(self, is_hard_mode: bool = False) -> None:
         try:
             print("\033[2J\033[H")
-            self.__game.create_session()
-            self.__game.do_next_session(is_hard_mode)
+            self.__game.run_session(is_hard_mode)
             self.__wait()
         except Exception as e:
             print(e, file=stderr)
-
-    def __play_hard_mode_round(self) -> None:
-        self.__play_round(is_hard_mode=True)
 
     def __list_sessions(self) -> None:
         print("Sessions:")
