@@ -124,15 +124,15 @@ class WordleSession:
 
         for char, (goal_char, color) in zip(guess, self.__last_guess_hints):
             if color == Color.GREEN:
-                if goal_char in rest_guess_chars:
-                    rest_guess_chars.remove(goal_char)
                 if char != goal_char:
                     return False
-            elif color == Color.YELLOW:
-                if goal_char in rest_guess_chars:
-                    rest_guess_chars.remove(goal_char)
-                else:
+                rest_guess_chars.remove(goal_char)
+
+        for char, (goal_char, color) in zip(guess, self.__last_guess_hints):
+            if color == Color.YELLOW:
+                if goal_char not in rest_guess_chars:
                     return False
+                rest_guess_chars.remove(goal_char)
         return True
 
 
