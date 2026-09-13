@@ -51,7 +51,7 @@ class WordleSession:
         self.__finished: bool = False
         self.__guess_count = guess_count
         self.__winner = False
-        self.__last_guess_hints: list[WordleLetterHint] = []
+        self.__last_guess_hints: list[tuple[str, Color]] = []
         self.is_hard_mode = is_hard_mode
 
     @property
@@ -232,7 +232,7 @@ class Program:
         print(f"Welcome to {self.GAME_NAME}!")
         sleep(1)
         self.__quit = False
-        self.MENU_ITEMS = [
+        self.MENU_ITEMS: list[tuple[list, str, Callable]] = [
             (["1", "play"], "Play round", Program.__play_round),
             (
                 ["2", "hard"],
